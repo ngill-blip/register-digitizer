@@ -136,8 +136,18 @@ def _parse_json(text: str) -> dict:
     return json.loads(text.strip())
 
 
+def _ssl_context():
+    """Use certifi's CA bundle — avoids macOS 'CERTIFICATE_VERIFY_FAILED' with python.org builds."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
 def call_gemini(images_b64: list[str], template_key: str) -> dict:
-    """FREE tier (Google AI Studio). Reads via the Gemini REST API — stdlib only."""
+    """FREE tier (Google AI Studio). Reads via the Gemini REST API."""
     import urllib.request
     parts = [{"inline_data": {"mime_type": "image/jpeg", "data": b}} for b in images_b64]
     parts.append({"text": build_prompt(template_key)})
@@ -149,7 +159,7 @@ def call_gemini(images_b64: list[str], template_key: str) -> dict:
            f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}")
     req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=120, context=_ssl_context()) as r:
         data = json.loads(r.read().decode())
     text = data["candidates"][0]["content"]["parts"][0]["text"]
     return _parse_json(text)
