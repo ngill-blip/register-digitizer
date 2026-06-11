@@ -7,18 +7,22 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 
-# 1. Vision key check (free Gemini preferred)
+# 1. Vision key — use env var, else a saved key file, else prompt once and save it.
+KEYFILE="$DIR/gemini_key.txt"
+if [ -z "$GEMINI_API_KEY" ] && [ -f "$KEYFILE" ]; then
+  GEMINI_API_KEY="$(tr -d '[:space:]' < "$KEYFILE")"
+fi
 if [ -z "$GEMINI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
   echo ""
-  echo "⚠️  No vision key set — the app will run in DEMO mode (sample data only)."
+  echo "  No vision key found yet."
+  echo "  Get a FREE Gemini key (no credit card): https://aistudio.google.com/apikey"
   echo ""
-  echo "    FREE live reading (recommended): get a free key at"
-  echo "        https://aistudio.google.com/apikey   (no credit card)"
-  echo "    then run:"
-  echo "        export GEMINI_API_KEY=AIza...        # paste your key"
-  echo "    and double-click this file again."
-  echo ""
-  read -r -p "Press Enter to continue in demo mode, or Ctrl+C to cancel… "
+  read -r -p "  Paste your Gemini API key (or press Enter for demo mode): " GEMINI_API_KEY
+  if [ -n "$GEMINI_API_KEY" ]; then
+    echo "$GEMINI_API_KEY" > "$KEYFILE"
+    chmod 600 "$KEYFILE" 2>/dev/null || true
+    echo "  ✅  Saved — future double-clicks will use this key automatically."
+  fi
 fi
 
 # 2. Start the app in a new Terminal tab (port 5060)

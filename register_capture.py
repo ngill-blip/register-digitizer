@@ -36,7 +36,10 @@ except OSError:
     EXPORT_DIR = BASE_DIR / "exports"; EXPORT_DIR.mkdir(exist_ok=True)
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "")     # FREE tier: aistudio.google.com/apikey
+GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "").strip()   # FREE tier: aistudio.google.com/apikey
+# Fallback: read a saved key file so a plain double-click launch works (no Terminal export needed).
+if not GEMINI_API_KEY and (BASE_DIR / "gemini_key.txt").exists():
+    GEMINI_API_KEY = (BASE_DIR / "gemini_key.txt").read_text().strip()
 ANTHROPIC_MODEL   = os.environ.get("VISION_MODEL", "claude-sonnet-4-6")
 GEMINI_MODEL      = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 MAX_IMG_DIM       = 2200          # downscale before upload (cost + speed)
