@@ -69,9 +69,37 @@ tr.pos td{background:var(--red-l)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:10px;font-weight:600;font-size:.85rem;opacity:0;transition:.25s;z-index:99}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:620px){.slots{grid-template-columns:1fr}}
+#gate{position:fixed;inset:0;background:var(--bg);z-index:3000;display:flex;flex-direction:column;
+ align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+body.unlocked #gate{display:none}
+body:not(.unlocked) .wrap{display:none}
+#gate .gk{font-family:Georgia,serif;font-size:1.5rem;color:var(--green)}
+#gate p{color:var(--muted);font-size:.9rem;max-width:380px}
+#gate input{padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:1rem;width:240px;text-align:center}
+#gate .err{color:var(--red);font-size:.82rem;min-height:18px}
+#qrbox{display:flex;align-items:center;gap:12px;background:var(--green-l);border:1px solid #c3ddcd;border-radius:11px;padding:10px 14px;margin-bottom:16px}
+#qrbox canvas,#qrbox img{border-radius:6px;background:#fff;padding:4px}
+#qrbox .qt{font-size:.8rem;color:var(--green-d);text-align:left}
+#qrbox .qt b{display:block;font-size:.88rem}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
+<div id="gate">
+  <div class="gk">Register Capture</div>
+  <p>Enter the access password shared in this session to continue.</p>
+  <input id="gpw" type="password" placeholder="Password" autocomplete="off"/>
+  <div class="err" id="gerr"></div>
+  <button class="cta" onclick="tryUnlock()">Enter</button>
+  <small style="color:var(--muted);font-size:.72rem;max-width:360px">Light access gate for a live preview. Uploaded photos are read in memory and never saved to disk.</small>
+</div>
+<script>
+function tryUnlock(){var v=document.getElementById('gpw').value;
+ if(v==='KenyaTB2026'){document.body.classList.add('unlocked');drawQR();}
+ else{document.getElementById('gerr').textContent='Incorrect password.';}}
+function drawQR(){try{var b=document.getElementById('qrcode');if(b&&!b.hasChildNodes()){new QRCode(b,{text:window.location.href,width:84,height:84});}}catch(e){}}
+document.addEventListener('keydown',function(e){if(e.key==='Enter'&&!document.body.classList.contains('unlocked'))tryUnlock();});
+</script>
 <div class="wrap">
   <header>
     <div class="logo">TB</div>
@@ -79,6 +107,11 @@ tr.pos td{background:var(--red-l)}
     {% if has_key %}<span class="modepill on">Vision: {{ model }}</span>
     {% else %}<span class="modepill off">Demo mode · no API key</span>{% endif %}
   </header>
+
+  <div id="qrbox">
+    <div id="qrcode"></div>
+    <div class="qt"><b>Scan to open on your phone</b>Point your camera here, then photograph a register page.</div>
+  </div>
 
   <!-- SETUP -->
   <div class="card" id="setup">
