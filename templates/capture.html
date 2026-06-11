@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Register Capture — TB Programme</title>
+<style>
+:root{
+  --green:#1f5e3f;--green-d:#143f2a;--green-l:#e7f1ea;--terra:#c75b39;
+  --amber:#b8860b;--amber-l:#fbf3dd;--red:#b3261e;--red-l:#fbe6e4;
+  --ink:#1c2620;--muted:#647067;--line:#dde3de;--bg:#f6f4ee;--card:#fff;
+  --mono:'SF Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 18px 80px}
+header{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:13px;margin-bottom:18px}
+.logo{width:34px;height:34px;border-radius:8px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+h1{font-family:Georgia,serif;font-size:1.35rem}
+.modepill{margin-left:auto;font-family:var(--mono);font-size:.7rem;font-weight:700;padding:5px 11px;border-radius:99px;text-transform:uppercase;letter-spacing:.06em}
+.modepill.on{background:var(--green-l);color:var(--green)}
+.modepill.off{background:var(--amber-l);color:var(--amber)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.card h2{font-size:1rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.h-num{width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:.8rem;display:flex;align-items:center;justify-content:center;font-weight:700}
+label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin:0 0 4px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>div{flex:1;min-width:160px}
+select,input[type=text]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:.9rem;background:#fff}
+select:focus,input:focus{outline:2px solid var(--green-l);border-color:var(--green)}
+
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.slot{border:1.5px dashed var(--line);border-radius:11px;padding:16px;text-align:center;cursor:pointer;transition:.15s;background:#fbfcfb;position:relative;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.slot:hover{border-color:var(--green);background:var(--green-l)}
+.slot.filled{border-style:solid;border-color:var(--green);padding:0;overflow:hidden}
+.slot img{width:100%;height:130px;object-fit:cover;display:block}
+.slot .lbl{font-size:.82rem;font-weight:700;color:var(--green)}
+.slot .hint{font-size:.72rem;color:var(--muted)}
+.slot .rm{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:6px;font-size:.7rem;padding:3px 7px;cursor:pointer}
+.guide{font-size:.78rem;color:var(--muted);background:var(--amber-l);border-radius:9px;padding:9px 12px;margin-top:12px;border:1px solid #ecdca6}
+.guide b{color:var(--ink)}
+
+.cta{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-size:.92rem;font-weight:700;cursor:pointer}
+.cta:hover{background:var(--green-d)}
+.cta:disabled{opacity:.45;cursor:not-allowed}
+.cta.sec{background:#fff;color:var(--green);border:1.5px solid var(--green)}
+
+#review{display:none}
+.meta{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:13px}
+.chip{font-size:.76rem;font-weight:600;border-radius:8px;padding:5px 11px;border:1px solid var(--line);background:#fbfbf9;color:var(--muted)}
+.chip b{color:var(--ink)}
+.chip.pos{background:var(--red-l);border-color:#eecac6;color:var(--red)}
+.chip.rev{background:var(--amber-l);border-color:#ecdca6;color:var(--amber)}
+.tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:.79rem;white-space:nowrap}
+th{background:var(--green);color:#fff;padding:8px 9px;text-align:left;font-size:.71rem;position:sticky;top:0}
+td{padding:5px 8px;border-bottom:1px solid #eef1ee;border-right:1px solid #f3f5f2;min-width:60px}
+td[contenteditable]:focus{outline:2px solid var(--green);background:#fff}
+tr.pos td{background:var(--red-l)}
+.c-medium{background:var(--amber-l);box-shadow:inset 0 -2px 0 #e7cf86}
+.c-low{background:var(--red-l);box-shadow:inset 0 -2px 0 #e7b3ad}
+.legend{display:flex;gap:15px;flex-wrap:wrap;font-size:.74rem;color:var(--muted);margin:11px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:13px;height:13px;border-radius:3px;display:inline-block}
+.spinner{width:38px;height:38px;border:3.5px solid var(--line);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:18px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.status{text-align:center;font-family:var(--mono);font-size:.8rem;color:var(--green);min-height:18px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:10px;font-weight:600;font-size:.85rem;opacity:0;transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:620px){.slots{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">TB</div>
+    <h1>Register Capture</h1>
+    {% if has_key %}<span class="modepill on">Vision: {{ model }}</span>
+    {% else %}<span class="modepill off">Demo mode · no API key</span>{% endif %}
+  </header>
+
+  <!-- SETUP -->
+  <div class="card" id="setup">
+    <h2><span class="h-num">1</span> Register &amp; page details</h2>
+    <div class="row">
+      <div>
+        <label>Register type</label>
+        <select id="template">
+          {% for key, t in templates.items() %}<option value="{{ key }}">{{ t.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div><label>Facility</label><input type="text" id="facility" placeholder="e.g. Rhodes Chest Clinic"/></div>
+      <div><label>Register / page no.</label><input type="text" id="pageno" placeholder="e.g. Book 4, p.12"/></div>
+    </div>
+
+    <h2 style="margin-top:20px"><span class="h-num">2</span> Capture the page</h2>
+    <div class="slots">
+      <div class="slot" id="slotL" onclick="pick('L')">
+        <div class="lbl">+ Left half</div>
+        <div class="hint">ID, name, age, phone, facility</div>
+      </div>
+      <div class="slot" id="slotR" onclick="pick('R')">
+        <div class="lbl">+ Right half</div>
+        <div class="hint">HIV, microscopy, GeneXpert, results</div>
+      </div>
+    </div>
+    <input type="file" id="fileL" accept="image/*" capture="environment" hidden/>
+    <input type="file" id="fileR" accept="image/*" capture="environment" hidden/>
+    <div class="guide">
+      <b>Tip for readable scans:</b> these registers are too wide for one sharp photo. Shoot the
+      <b>left half</b> then the <b>right half</b> of the same page, holding the phone flat and steady in good light.
+      One half is enough to test — both gives the full record.
+    </div>
+    <div style="margin-top:16px">
+      <button class="cta" id="extractBtn" onclick="extract()" disabled>Read this page →</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="spinner" id="spin" style="display:none"></div>
+  </div>
+
+  <!-- REVIEW -->
+  <div class="card" id="review">
+    <h2><span class="h-num">3</span> Review &amp; correct</h2>
+    <div class="meta" id="meta"></div>
+    <div class="legend">
+      <span><span class="sw" style="background:#fff;border:1px solid var(--line)"></span>High confidence</span>
+      <span><span class="sw c-medium" style="box-shadow:none"></span>Medium — check</span>
+      <span><span class="sw c-low" style="box-shadow:none"></span>Low — verify against paper</span>
+      <span style="color:var(--green)">Tap any cell to correct it.</span>
+    </div>
+    <div class="tbl-scroll"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="cta" onclick="exportCSV()">⬇ Export to Excel/CSV</button>
+      <button class="cta sec" onclick="reset()">+ Capture another page</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const imgs={L:null,R:null};
+let COLS=[], ROWS=[];
+const $=s=>document.querySelector(s);
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._);t._=setTimeout(()=>t.classList.remove("show"),2200)};
+
+function pick(side){ $("#file"+side).click(); }
+["L","R"].forEach(side=>{
+  $("#file"+side).addEventListener("change",e=>{
+    const f=e.target.files[0]; if(!f)return;
+    imgs[side]=f;
+    const slot=$("#slot"+side); const url=URL.createObjectURL(f);
+    slot.classList.add("filled");
+    slot.innerHTML=`<img src="${url}"/><button class="rm" onclick="event.stopPropagation();clearSlot('${side}')">remove</button>`;
+    $("#extractBtn").disabled = !(imgs.L||imgs.R);
+  });
+});
+function clearSlot(side){
+  imgs[side]=null;
+  const slot=$("#slot"+side); slot.classList.remove("filled");
+  const lbl=side==='L'?'Left half':'Right half';
+  const hint=side==='L'?'ID, name, age, phone, facility':'HIV, microscopy, GeneXpert, results';
+  slot.innerHTML=`<div class="lbl">+ ${lbl}</div><div class="hint">${hint}</div>`;
+  $("#extractBtn").disabled = !(imgs.L||imgs.R);
+}
+
+async function extract(){
+  $("#extractBtn").disabled=true; $("#spin").style.display="block";
+  const steps=["Uploading page…","Detecting table grid…","Reading handwriting…","Scoring confidence…"];
+  let i=0; $("#status").textContent=steps[0];
+  const iv=setInterval(()=>{ i=(i+1)%steps.length; $("#status").textContent=steps[i]; },900);
+
+  const fd=new FormData();
+  fd.append("template",$("#template").value);
+  if(imgs.L) fd.append("images",imgs.L);
+  if(imgs.R) fd.append("images",imgs.R);
+  try{
+    const res=await fetch("/api/extract",{method:"POST",body:fd});
+    const data=await res.json();
+    clearInterval(iv); $("#spin").style.display="none"; $("#status").textContent="";
+    if(!res.ok){ toast("⚠ "+(data.error||"Failed")); $("#extractBtn").disabled=false; return; }
+    COLS=data.columns; ROWS=data.rows||[];
+    if(data.mode==="sample") toast("Demo mode — showing sample data (set an API key to read live)");
+    renderTable();
+    $("#review").style.display="block";
+    $("#review").scrollIntoView({behavior:"smooth"});
+  }catch(e){ clearInterval(iv); $("#spin").style.display="none"; toast("Error: "+e.message); $("#extractBtn").disabled=false; }
+}
+
+function isPos(r){ const m=(r.microscopy_result||{}).v||""; const g=(r.genexpert_result||{}).v||"";
+  return /\+|AFB|TB seen/i.test(m) || /MTB detected/i.test(g); }
+
+function renderTable(){
+  const th=$("#tbl thead"), tb=$("#tbl tbody");
+  th.innerHTML="<tr>"+COLS.map(c=>`<th>${c[1].split('(')[0].split('—')[0].trim()}</th>`).join("")+"</tr>";
+  tb.innerHTML="";
+  let flagged=0, pos=0;
+  ROWS.forEach((r,ri)=>{
+    const tr=document.createElement("tr");
+    if(isPos(r)){ tr.className="pos"; pos++; }
+    COLS.forEach(([k])=>{
+      const cell=r[k]||{v:"",c:"high"};
+      const td=document.createElement("td");
+      td.contentEditable="true";
+      td.dataset.row=ri; td.dataset.key=k;
+      if(cell.c==="medium"){td.className="c-medium";flagged++;}
+      else if(cell.c==="low"){td.className="c-low";flagged++;}
+      td.textContent=cell.v;
+      td.addEventListener("input",()=>{ ROWS[ri][k]={v:td.textContent.trim(),c:"high"}; td.className=""; });
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  $("#meta").innerHTML=
+    `<span class="chip"><b>${ROWS.length}</b> records</span>`+
+    `<span class="chip"><b>${COLS.length}</b> columns</span>`+
+    (pos?`<span class="chip pos"><b>${pos}</b> positive — urgent</span>`:``)+
+    `<span class="chip rev"><b>${flagged}</b> cells to review</span>`;
+}
+
+async function exportCSV(){
+  const res=await fetch("/api/export",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({rows:ROWS,columns:COLS})});
+  if(!res.ok){toast("Export failed");return;}
+  const blob=await res.blob(); const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="register.csv"; a.click();
+  toast("Exported ✓");
+}
+function reset(){
+  clearSlot('L'); clearSlot('R');
+  ROWS=[]; $("#review").style.display="none";
+  $("#extractBtn").disabled=true; window.scrollTo({top:0,behavior:"smooth"});
+}
+</script>
+</body>
+</html>

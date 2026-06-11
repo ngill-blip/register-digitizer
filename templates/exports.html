@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Exports — Form Digitizer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --brand: #2E6B87; --brand-dk: #1e4f65; --brand-lt: #e8f4fa;
+    --accent: #22a06b; --danger: #d32f2f; --bg: #f5f7fa;
+    --card: #ffffff; --text: #1a2332; --muted: #6b7a8e; --border: #dde2ea;
+    --radius: 12px; --shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+  .app-header {
+    background: var(--brand); color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15); position: sticky; top: 0; z-index: 100;
+  }
+  .app-header h1 { font-size: 1.1rem; font-weight: 700; }
+  .back-link {
+    margin-left: auto; color: rgba(255,255,255,.85); font-size: .85rem;
+    text-decoration: none; display: flex; align-items: center; gap: 5px;
+  }
+  .back-link:hover { color: #fff; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+
+  .page-title {
+    font-size: 1.3rem; font-weight: 800; color: var(--brand);
+    margin-bottom: 6px;
+  }
+  .page-subtitle { color: var(--muted); font-size: .88rem; margin-bottom: 22px; }
+
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+  thead tr { background: var(--brand); color: #fff; }
+  th { padding: 11px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--brand-lt); }
+  td { padding: 10px 14px; vertical-align: middle; }
+
+  .file-name { font-weight: 600; color: var(--text); word-break: break-all; }
+  .file-meta { font-size: .78rem; color: var(--muted); }
+
+  .badge-xlsx   { background: #d4edda; color: #1b7a47; }
+  .badge-csv    { background: #fff3cd; color: #7d5a00; }
+  .badge-auto   { background: #e8f4fa; color: #2E6B87; }
+  .badge-manual { background: #f3f0ff; color: #5b21b6; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 99px;
+    font-size: .74rem; font-weight: 700; text-transform: uppercase;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 13px; border-radius: 7px; font-size: .82rem;
+    font-weight: 600; cursor: pointer; border: none; text-decoration: none;
+    transition: all .15s;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-dk); }
+  .btn-danger-outline {
+    background: transparent; color: var(--danger);
+    border: 1.5px solid var(--danger);
+  }
+  .btn-danger-outline:hover { background: #fdecea; }
+  .actions { display: flex; gap: 6px; }
+
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .empty-state svg { margin-bottom: 14px; opacity: .35; }
+  .empty-state p { font-size: .92rem; }
+  .empty-state a { color: var(--brand); font-weight: 600; text-decoration: none; }
+
+  .summary-bar {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--card); border-radius: 10px; padding: 12px 18px;
+    border: 1px solid var(--border); font-size: .82rem;
+  }
+  .stat-value { font-size: 1.4rem; font-weight: 800; color: var(--brand); display: block; }
+
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1a2332; color: #fff; padding: 11px 22px; border-radius: 99px;
+    font-size: .88rem; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,.25);
+    z-index: 9999; opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+  <h1>Exports</h1>
+  <a href="/" class="back-link">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+    Back to app
+  </a>
+</header>
+
+<main>
+  <div class="page-title">All Exports</div>
+  <div class="page-subtitle">Every file exported by your team — saved automatically on this server.</div>
+
+  {% if exports %}
+  <!-- Stats -->
+  <div class="summary-bar">
+    <div class="stat">
+      <span class="stat-value">{{ exports|length }}</span>Total scans
+    </div>
+    <div class="stat">
+      <span class="stat-value" style="color:var(--brand)">{{ exports|selectattr('auto_saved')|list|length }}</span>⚡ Auto-saved
+    </div>
+    <div class="stat">
+      <span class="stat-value" style="color:#5b21b6">{{ exports|rejectattr('auto_saved')|list|length }}</span>⬇️ Downloaded
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Scanned at</th>
+            <th>Source</th>
+            <th>Size</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="exports-body">
+          {% for export in exports %}
+          <tr id="row-{{ loop.index }}">
+            <td class="file-name">{{ export.modified }}</td>
+            <td>
+              {% if export.auto_saved %}
+                <span class="badge badge-auto">⚡ Auto-saved</span>
+              {% else %}
+                <span class="badge badge-manual">⬇️ Downloaded</span>
+              {% endif %}
+            </td>
+            <td class="file-meta">{{ export.size_kb }} KB</td>
+            <td>
+              <div class="actions">
+                <a href="/exports/download/{{ export.name }}" class="btn btn-primary">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download
+                </a>
+                <button class="btn btn-danger-outline" onclick="deleteExport('{{ export.name }}', {{ loop.index }})">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  </svg>
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="card">
+    <div class="empty-state">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <p>No exports yet. <a href="/">Digitize a form</a> and download the results — they'll appear here.</p>
+    </div>
+  </div>
+  {% endif %}
+</main>
+
+<div id="toast"></div>
+
+<script>
+async function deleteExport(filename, idx) {
+  if (!confirm(`Delete ${filename}?`)) return;
+  const res = await fetch(`/exports/delete/${encodeURIComponent(filename)}`, { method: 'POST' });
+  if (res.ok) {
+    document.getElementById(`row-${idx}`)?.remove();
+    showToast('Deleted');
+  } else {
+    showToast('Delete failed');
+  }
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>

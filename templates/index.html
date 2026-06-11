@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Form Digitizer</title>
+<style>
+/* ── Reset ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --brand:    #2E6B87;
+  --brand-dk: #1e4f65;
+  --brand-lt: #e8f4fa;
+  --accent:   #22a06b;
+  --accent-dk:#1a8055;
+  --warn:     #e5a000;
+  --danger:   #d32f2f;
+  --bg:       #f0f4f8;
+  --card:     #ffffff;
+  --text:     #1a2332;
+  --muted:    #6b7a8e;
+  --border:   #dde2ea;
+  --radius:   16px;
+  --shadow:   0 2px 16px rgba(0,0,0,.08);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, 'Inter', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  background: var(--brand); color: #fff;
+  padding: 14px 16px 14px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.header-title { font-size: 1.05rem; font-weight: 700; flex: 1; }
+.header-right  { display: flex; align-items: center; gap: 10px; }
+.exports-link  {
+  color: rgba(255,255,255,.85); font-size: .8rem; font-weight: 600;
+  text-decoration: none; padding: 5px 10px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.3);
+}
+.exports-link:active { background: rgba(255,255,255,.15); }
+.health-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
+.health-dot.error { background: #f44336; }
+
+/* ── Main scroll area ───────────────────────────────────────── */
+main {
+  padding: 16px 14px;
+  padding-bottom: calc(90px + var(--safe-bottom));
+  max-width: 600px; margin: 0 auto;
+}
+
+/* ── Cards ──────────────────────────────────────────────────── */
+.card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden;
+}
+.card-body { padding: 16px; }
+.card-title {
+  font-size: .92rem; font-weight: 700; color: var(--brand);
+  display: flex; align-items: center; gap: 7px; margin-bottom: 12px;
+}
+
+/* ── Upload hero ────────────────────────────────────────────── */
+.scan-hero {
+  background: linear-gradient(135deg, var(--brand) 0%, #1e4f65 100%);
+  border-radius: var(--radius); padding: 28px 20px 24px;
+  text-align: center; color: #fff; margin-bottom: 14px;
+  box-shadow: 0 4px 20px rgba(46,107,135,.35);
+}
+.scan-hero-icon {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: rgba(255,255,255,.15); display: flex;
+  align-items: center; justify-content: center;
+  margin: 0 auto 14px; border: 2px solid rgba(255,255,255,.3);
+}
+.scan-hero h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 5px; }
+.scan-hero p  { font-size: .85rem; opacity: .8; margin-bottom: 20px; line-height: 1.5; }
+
+.btn-camera {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; background: #fff; color: var(--brand);
+  font-weight: 800; font-size: 1rem; padding: 14px 28px;
+  border-radius: 99px; border: none; cursor: pointer; width: 100%;
+  box-shadow: 0 4px 14px rgba(0,0,0,.15);
+  transition: transform .1s, box-shadow .1s;
+  -webkit-user-select: none;
+}
+.btn-camera:active { transform: scale(.97); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+
+.btn-gallery {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; background: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.9); font-size: .88rem; font-weight: 600;
+  padding: 10px 20px; border-radius: 99px;
+  border: 1.5px solid rgba(255,255,255,.3);
+  cursor: pointer; margin-top: 10px; width: 100%;
+  transition: background .15s;
+}
+.btn-gallery:active { background: rgba(255,255,255,.2); }
+
+#file-input { display: none; }
+
+/* ── Camera overlay screen ──────────────────────────────────── */
+#camera-screen {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: #000; flex-direction: column;
+}
+#camera-video {
+  width: 100%; height: 100%; object-fit: cover;
+  position: absolute; inset: 0;
+}
+
+/* Dark vignette mask around the guide frame */
+.cam-mask {
+  position: absolute; inset: 0; pointer-events: none;
+}
+
+/* The clear document window */
+.cam-frame {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -52%);
+  width: 86vw;
+  height: calc(86vw * 1.414); /* A4 portrait ratio */
+  max-height: 72vh;
+  max-width: calc(72vh / 1.414);
+}
+
+/* Animated corner brackets */
+.corner {
+  position: absolute; width: 28px; height: 28px;
+  border-color: #fff; border-style: solid; border-width: 0;
+  transition: border-color .3s;
+}
+.corner.tl { top: 0;  left: 0;  border-top-width: 4px; border-left-width: 4px;  border-radius: 4px 0 0 0; }
+.corner.tr { top: 0;  right: 0; border-top-width: 4px; border-right-width: 4px; border-radius: 0 4px 0 0; }
+.corner.bl { bottom: 0; left: 0;  border-bottom-width: 4px; border-left-width: 4px;  border-radius: 0 0 0 4px; }
+.corner.br { bottom: 0; right: 0; border-bottom-width: 4px; border-right-width: 4px; border-radius: 0 0 4px 0; }
+.cam-frame.aligned .corner { border-color: #22a06b; }
+
+/* Subtle thirds grid inside frame */
+.cam-grid {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.cam-grid line { stroke: rgba(255,255,255,.18); stroke-width: 1; }
+
+/* Hint text */
+.cam-hint {
+  position: absolute; bottom: calc(100% + 10px); left: 0; right: 0;
+  text-align: center; color: #fff; font-size: .82rem; font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6); letter-spacing: .2px;
+  transition: color .3s;
+}
+.cam-frame.aligned .cam-hint { color: #4ade80; }
+
+/* Camera controls bar */
+.cam-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 20px 24px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(transparent, rgba(0,0,0,.7));
+}
+.cam-close {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.cam-shutter {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: #fff; border: 4px solid rgba(255,255,255,.4);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform .1s, background .1s;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.25);
+}
+.cam-shutter:active { transform: scale(.92); background: #e0e0e0; }
+.cam-shutter-inner {
+  width: 56px; height: 56px; border-radius: 50%; background: #fff;
+  border: 3px solid rgba(0,0,0,.1);
+}
+.cam-gallery-btn {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  font-size: .68rem; font-weight: 700; text-align: center; line-height: 1.2;
+}
+
+/* Top bar */
+.cam-topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(rgba(0,0,0,.5), transparent);
+}
+.cam-title { color: #fff; font-size: .9rem; font-weight: 700; }
+.cam-tip {
+  color: rgba(255,255,255,.8); font-size: .75rem;
+  background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 99px;
+}
+
+/* ── Preview ────────────────────────────────────────────────── */
+.preview-card { display: none; }
+.preview-img-wrap {
+  position: relative; background: #000; border-radius: var(--radius) var(--radius) 0 0;
+  overflow: hidden; max-height: 260px; display: flex; align-items: center; justify-content: center;
+}
+#preview-img { width: 100%; max-height: 260px; object-fit: contain; display: block; }
+.preview-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 8px 12px; background: linear-gradient(transparent, rgba(0,0,0,.6));
+  color: #fff; font-size: .78rem;
+}
+.retake-btn {
+  position: absolute; top: 10px; right: 10px;
+  background: rgba(0,0,0,.55); color: #fff; border: none;
+  border-radius: 99px; padding: 6px 12px; font-size: .78rem;
+  font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;
+}
+
+/* ── Progress ───────────────────────────────────────────────── */
+.progress-card { display: none; }
+.progress-inner { padding: 20px 16px; text-align: center; }
+.spinner {
+  width: 44px; height: 44px; border: 3.5px solid var(--border);
+  border-top-color: var(--brand); border-radius: 50%;
+  animation: spin .8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.progress-label { font-size: .9rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.progress-sub   { font-size: .78rem; color: var(--muted); }
+.progress-track { background: var(--border); border-radius: 99px; height: 4px; margin-top: 14px; overflow: hidden; }
+.progress-fill  { height: 100%; background: var(--brand); border-radius: 99px; width: 0%; transition: width .4s ease; }
+
+/* ── Results ────────────────────────────────────────────────── */
+.results-section { display: none; }
+
+/* Language badge */
+.lang-badge {
+  display: none; font-size: .74rem; font-weight: 700;
+  background: var(--brand-lt); color: var(--brand);
+  padding: 3px 10px; border-radius: 99px; border: 1px solid #b8d9ea;
+  margin-left: auto;
+}
+
+/* Stats strip */
+.stats-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden;
+}
+.stat-item {
+  text-align: center; padding: 12px 6px;
+  border-right: 1px solid var(--border);
+}
+.stat-item:last-child { border-right: none; }
+.stat-value { font-size: 1.3rem; font-weight: 800; color: var(--brand); display: block; }
+.stat-label { font-size: .68rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+
+/* Field cards (mobile-first, no wide table) */
+.fields-list { display: flex; flex-direction: column; gap: 8px; }
+
+.field-item {
+  background: var(--card); border-radius: 12px; padding: 13px 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06); border-left: 4px solid var(--border);
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.field-item.conf-high   { border-left-color: #22a06b; }
+.field-item.conf-medium { border-left-color: var(--warn); }
+.field-item.conf-low    { border-left-color: var(--danger); }
+
+.field-content { flex: 1; min-width: 0; }
+.field-name {
+  font-size: .75rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .4px; margin-bottom: 3px;
+}
+.field-value {
+  font-size: .95rem; font-weight: 600; color: var(--text);
+  word-break: break-word; min-height: 22px;
+}
+.field-value[contenteditable]:focus {
+  outline: none; border-bottom: 2px solid var(--brand); padding-bottom: 1px;
+}
+.field-value:empty::before { content: attr(data-placeholder); color: var(--muted); font-weight: 400; }
+
+.field-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 8px; border: none;
+  background: var(--bg); color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.icon-btn:active { background: #fdecea; color: var(--danger); }
+
+/* Add field bar */
+.add-field-bar {
+  display: none; background: var(--brand-lt);
+  border-radius: 12px; padding: 12px; margin-top: 8px;
+  border: 1.5px dashed var(--brand);
+}
+.add-field-bar input {
+  width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+  border-radius: 9px; font-size: .9rem; margin-bottom: 8px; outline: none;
+}
+.add-field-bar input:focus { border-color: var(--brand); }
+.add-field-row { display: flex; gap: 8px; }
+
+/* Raw OCR */
+.raw-toggle {
+  font-size: .78rem; color: var(--brand); font-weight: 600;
+  background: none; border: none; cursor: pointer; padding: 0;
+  display: flex; align-items: center; gap: 4px;
+}
+#raw-text {
+  font-family: monospace; font-size: .75rem; color: var(--muted);
+  background: var(--bg); border-radius: 8px; padding: 10px;
+  max-height: 180px; overflow-y: auto; white-space: pre-wrap;
+  margin-top: 8px; display: none;
+}
+
+/* ── Sticky bottom bar ──────────────────────────────────────── */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+  background: var(--card); border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  padding-bottom: calc(12px + var(--safe-bottom));
+  box-shadow: 0 -4px 20px rgba(0,0,0,.08);
+  display: none;
+}
+.bottom-bar-inner { display: flex; gap: 10px; max-width: 600px; margin: 0 auto; }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 7px; padding: 13px 18px; border-radius: 12px;
+  font-size: .9rem; font-weight: 700; border: none; cursor: pointer;
+  transition: transform .1s, opacity .15s; -webkit-user-select: none;
+  text-decoration: none;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--brand); color: #fff; flex: 1; }
+.btn-success { background: var(--accent); color: #fff; flex: 1; }
+.btn-outline {
+  background: transparent; color: var(--brand);
+  border: 1.5px solid var(--brand);
+}
+.btn-ghost {
+  background: var(--bg); color: var(--muted); padding: 13px 14px;
+}
+.btn:disabled { opacity: .45; pointer-events: none; }
+
+/* ── Scan-next FAB (shown after save) ───────────────────────── */
+.fab-wrap { display: none; text-align: center; padding: 8px 0 4px; }
+.fab {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent); color: #fff;
+  font-size: 1rem; font-weight: 800;
+  padding: 16px 32px; border-radius: 99px; border: none; cursor: pointer;
+  box-shadow: 0 6px 24px rgba(34,160,107,.4);
+  animation: bounce-in .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes bounce-in {
+  from { transform: scale(.7); opacity: 0; }
+  to   { transform: scale(1);  opacity: 1; }
+}
+.fab:active { transform: scale(.96); }
+
+/* ── Empty / error state ────────────────────────────────────── */
+.empty-state { text-align: center; padding: 32px 16px; color: var(--muted); font-size: .88rem; }
+
+/* ── Toast ──────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+  background: #1a2332; color: #fff; padding: 11px 22px;
+  border-radius: 99px; font-size: .87rem; font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0,0,0,.25); z-index: 9999;
+  opacity: 0; transition: opacity .22s; pointer-events: none; white-space: nowrap;
+  max-width: calc(100vw - 40px);
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────── -->
+<header class="header">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+  </svg>
+  <span class="header-title">Form Digitizer</span>
+  <div class="header-right">
+    <a href="/exports" class="exports-link">Exports</a>
+    <div id="health-dot" class="health-dot" title="OK"></div>
+  </div>
+</header>
+
+<!-- ── CAMERA OVERLAY SCREEN ──────────────────────────────────── -->
+<div id="camera-screen">
+  <video id="camera-video" autoplay playsinline muted></video>
+
+  <!-- SVG mask with transparent cutout -->
+  <svg class="cam-mask" style="position:absolute;inset:0;width:100%;height:100%;" id="cam-mask-svg">
+    <defs>
+      <mask id="frame-mask">
+        <rect width="100%" height="100%" fill="white"/>
+        <rect id="cutout-rect" fill="black" rx="6"/>
+      </mask>
+    </defs>
+    <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#frame-mask)"/>
+  </svg>
+
+  <!-- Document frame with corners and grid -->
+  <div class="cam-frame" id="cam-frame">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <!-- Rule-of-thirds grid -->
+    <svg class="cam-grid" id="cam-grid-svg" xmlns="http://www.w3.org/2000/svg">
+      <line id="g1" x1="33.3%" y1="0" x2="33.3%" y2="100%"/>
+      <line id="g2" x1="66.6%" y1="0" x2="66.6%" y2="100%"/>
+      <line id="g3" x1="0" y1="33.3%" x2="100%" y2="33.3%"/>
+      <line id="g4" x1="0" y1="66.6%" x2="100%" y2="66.6%"/>
+    </svg>
+    <div class="cam-hint" id="cam-hint">Align form to fill the frame</div>
+  </div>
+
+  <!-- Top bar -->
+  <div class="cam-topbar">
+    <span class="cam-title">📋 Form Scanner</span>
+    <span class="cam-tip">Hold steady · Good light</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="cam-controls">
+    <button class="cam-close" id="cam-close-btn" aria-label="Close camera">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <button class="cam-shutter" id="cam-shutter-btn" aria-label="Capture">
+      <div class="cam-shutter-inner"></div>
+    </button>
+    <button class="cam-gallery-btn" id="cam-gallery-overlay-btn" aria-label="Choose file">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<canvas id="capture-canvas" style="display:none;"></canvas>
+
+<main id="main">
+
+  <!-- ── SCAN HERO ─────────────────────────────────────────────── -->
+  <div class="scan-hero" id="scan-hero">
+    <div class="scan-hero-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </div>
+    <h2>Scan a Form</h2>
+    <p>Point your camera at a paper form.<br/>Fields are extracted automatically.</p>
+    <button class="btn-camera" id="camera-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      Take Photo
+    </button>
+    <button class="btn-gallery" id="gallery-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+      </svg>
+      Choose from Library
+    </button>
+  </div>
+  <input type="file" id="file-input" accept="image/*,.pdf"/>
+
+  <!-- ── PREVIEW ───────────────────────────────────────────────── -->
+  <div class="card preview-card" id="preview-card">
+    <div class="preview-img-wrap">
+      <img id="preview-img" src="" alt="Preview"/>
+      <button class="retake-btn" id="retake-btn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="1 4 1 10 7 10"/>
+          <path d="M3.51 15a9 9 0 1 0 .49-3.6"/>
+        </svg>
+        Retake
+      </button>
+      <div class="preview-overlay" id="preview-meta"></div>
+    </div>
+    <div class="card-body" style="padding-bottom:12px;">
+      <button class="btn btn-primary" id="extract-btn" style="width:100%;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Extract Fields
+      </button>
+    </div>
+  </div>
+
+  <!-- ── PROGRESS ──────────────────────────────────────────────── -->
+  <div class="card progress-card" id="progress-card">
+    <div class="progress-inner">
+      <div class="spinner"></div>
+      <div class="progress-label" id="progress-label">Processing…</div>
+      <div class="progress-sub"  id="progress-sub">Preparing image</div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- ── RESULTS ───────────────────────────────────────────────── -->
+  <div class="results-section" id="results-section">
+
+    <!-- Stats strip -->
+    <div class="stats-strip" id="stats-strip">
+      <div class="stat-item"><span class="stat-value" id="s-total">0</span><span class="stat-label">Fields</span></div>
+      <div class="stat-item"><span class="stat-value" id="s-high"  style="color:var(--accent)">0</span><span class="stat-label">High</span></div>
+      <div class="stat-item"><span class="stat-value" id="s-med"   style="color:var(--warn)">0</span><span class="stat-label">Medium</span></div>
+      <div class="stat-item"><span class="stat-value" id="s-empty" style="color:var(--danger)">0</span><span class="stat-label">Review</span></div>
+    </div>
+
+    <!-- Fields card -->
+    <div class="card">
+      <div class="card-body">
+        <div class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Review Fields
+          <span class="lang-badge" id="lang-badge"></span>
+        </div>
+
+        <div class="fields-list" id="fields-list"></div>
+
+        <!-- Add field -->
+        <div class="add-field-bar" id="add-field-bar">
+          <input type="text" id="new-field-name" placeholder="Field name…"/>
+          <input type="text" id="new-field-value" placeholder="Value…"/>
+          <div class="add-field-row">
+            <button class="btn btn-success btn-sm" id="confirm-add-btn" style="flex:1;padding:10px;">Add</button>
+            <button class="btn btn-ghost btn-sm"   id="cancel-add-btn"  style="padding:10px 14px;">Cancel</button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+          <button class="btn btn-ghost" id="add-field-btn"
+            style="font-size:.82rem;padding:8px 12px;color:var(--brand);border:1.5px solid var(--border);">
+            + Add field
+          </button>
+          <button class="raw-toggle" id="raw-toggle-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+            Raw OCR
+          </button>
+        </div>
+        <div id="raw-text"></div>
+      </div>
+    </div>
+
+    <!-- Scan-next FAB -->
+    <div class="fab-wrap" id="fab-wrap">
+      <button class="fab" id="fab-scan-next">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        Scan Next Form
+      </button>
+    </div>
+
+  </div><!-- /results-section -->
+
+</main>
+
+<!-- ── Sticky bottom bar ───────────────────────────────────────── -->
+<div class="bottom-bar" id="bottom-bar">
+  <div class="bottom-bar-inner">
+    <button class="btn btn-success" id="save-next-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      Save &amp; Scan Next
+    </button>
+    <button class="btn btn-primary" id="export-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Excel
+    </button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────
+let currentFields = [];
+let currentRaw    = "";
+let selectedFile  = null;
+
+// ── DOM ──────────────────────────────────────────────────────────
+const cameraBtn    = document.getElementById("camera-btn");
+const galleryBtn   = document.getElementById("gallery-btn");
+const fileInput    = document.getElementById("file-input");
+const scanHero     = document.getElementById("scan-hero");
+const previewCard  = document.getElementById("preview-card");
+const previewImg   = document.getElementById("preview-img");
+const previewMeta  = document.getElementById("preview-meta");
+const retakeBtn    = document.getElementById("retake-btn");
+const extractBtn   = document.getElementById("extract-btn");
+const progressCard = document.getElementById("progress-card");
+const progressFill = document.getElementById("progress-fill");
+const progressLbl  = document.getElementById("progress-label");
+const progressSub  = document.getElementById("progress-sub");
+const resultsSection = document.getElementById("results-section");
+const fieldsList   = document.getElementById("fields-list");
+const langBadge    = document.getElementById("lang-badge");
+const rawText      = document.getElementById("raw-text");
+const rawToggleBtn = document.getElementById("raw-toggle-btn");
+const addFieldBtn  = document.getElementById("add-field-btn");
+const addFieldBar  = document.getElementById("add-field-bar");
+const confirmAddBtn= document.getElementById("confirm-add-btn");
+const cancelAddBtn = document.getElementById("cancel-add-btn");
+const bottomBar    = document.getElementById("bottom-bar");
+const saveNextBtn  = document.getElementById("save-next-btn");
+const exportBtn    = document.getElementById("export-btn");
+const fabWrap      = document.getElementById("fab-wrap");
+const fabScanNext  = document.getElementById("fab-scan-next");
+
+// ── Health check ─────────────────────────────────────────────────
+(async () => {
+  try {
+    const r = await fetch("/api/health");
+    const d = await r.json();
+    if (d.status !== "ok") document.getElementById("health-dot").classList.add("error");
+  } catch { document.getElementById("health-dot").classList.add("error"); }
+})();
+
+// ── Camera overlay ───────────────────────────────────────────────
+const cameraScreen  = document.getElementById("camera-screen");
+const cameraVideo   = document.getElementById("camera-video");
+const camFrame      = document.getElementById("cam-frame");
+const camHint       = document.getElementById("cam-hint");
+const camShutterBtn = document.getElementById("cam-shutter-btn");
+const camCloseBtn   = document.getElementById("cam-close-btn");
+const camGalleryBtn = document.getElementById("cam-gallery-overlay-btn");
+const captureCanvas = document.getElementById("capture-canvas");
+const cutoutRect    = document.getElementById("cutout-rect");
+
+let cameraStream = null;
+let alignTick = 0;
+let alignInterval = null;
+
+async function openCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    cameraStream = stream;
+    cameraVideo.srcObject = stream;
+    cameraScreen.style.display = "flex";
+    document.body.style.overflow = "hidden";
+    // Wait for video dimensions then position cutout
+    cameraVideo.addEventListener("loadedmetadata", positionCutout, { once: true });
+    positionCutout();
+    startAlignPulse();
+  } catch {
+    // getUserMedia not available or denied — fall back to native capture
+    fileInput.setAttribute("capture", "environment");
+    fileInput.click();
+  }
+}
+
+function positionCutout() {
+  requestAnimationFrame(() => {
+    const r = camFrame.getBoundingClientRect();
+    cutoutRect.setAttribute("x",      r.left);
+    cutoutRect.setAttribute("y",      r.top);
+    cutoutRect.setAttribute("width",  r.width);
+    cutoutRect.setAttribute("height", r.height);
+  });
+}
+window.addEventListener("resize", positionCutout);
+
+function startAlignPulse() {
+  // Visual breathing cue — corners pulse green every few seconds
+  alignInterval = setInterval(() => {
+    alignTick++;
+    const ok = alignTick % 4 !== 0;
+    camFrame.classList.toggle("aligned", ok);
+    camHint.textContent = ok
+      ? "✓ Looking good — tap shutter to capture"
+      : "Align form edges with the corners";
+  }, 2200);
+}
+
+function stopCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  clearInterval(alignInterval); alignTick = 0;
+  cameraScreen.style.display = "none";
+  document.body.style.overflow = "";
+  camFrame.classList.remove("aligned");
+}
+
+camCloseBtn.addEventListener("click", stopCamera);
+
+camShutterBtn.addEventListener("click", () => {
+  const vw = cameraVideo.videoWidth  || 1920;
+  const vh = cameraVideo.videoHeight || 1080;
+  const fr = camFrame.getBoundingClientRect();
+  const sw = window.innerWidth, sh = window.innerHeight;
+
+  // Map screen frame to video pixel coords
+  const sx = (fr.left / sw) * vw;
+  const sy = (fr.top  / sh) * vh;
+  const sw2 = (fr.width  / sw) * vw;
+  const sh2 = (fr.height / sh) * vh;
+
+  const useClip = sw2 > 200 && sh2 > 200;
+  captureCanvas.width  = useClip ? sw2 : vw;
+  captureCanvas.height = useClip ? sh2 : vh;
+  const ctx = captureCanvas.getContext("2d");
+  if (useClip) ctx.drawImage(cameraVideo, sx, sy, sw2, sh2, 0, 0, sw2, sh2);
+  else         ctx.drawImage(cameraVideo, 0, 0);
+
+  // White flash
+  const flash = document.createElement("div");
+  flash.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9999;opacity:.85;transition:opacity .2s;pointer-events:none;";
+  document.body.appendChild(flash);
+  setTimeout(() => { flash.style.opacity = "0"; setTimeout(() => flash.remove(), 220); }, 40);
+
+  captureCanvas.toBlob(blob => {
+    if (!blob) return;
+    stopCamera();
+    showPreview(new File([blob], "scan.jpg", { type: "image/jpeg" }));
+  }, "image/jpeg", 0.93);
+});
+
+camGalleryBtn.addEventListener("click", () => {
+  stopCamera();
+  fileInput.removeAttribute("capture");
+  fileInput.click();
+});
+
+// ── Upload ───────────────────────────────────────────────────────
+cameraBtn.addEventListener("click", openCamera);
+galleryBtn.addEventListener("click", () => {
+  fileInput.removeAttribute("capture");
+  fileInput.click();
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) showPreview(fileInput.files[0]);
+});
+retakeBtn.addEventListener("click", resetToScan);
+
+function showPreview(file) {
+  selectedFile = file;
+  previewImg.src = URL.createObjectURL(file);
+  const mb = (file.size / 1024 / 1024).toFixed(1);
+  previewMeta.textContent = `${file.name}  ·  ${mb} MB`;
+  scanHero.style.display    = "none";
+  previewCard.style.display = "block";
+  resultsSection.style.display = "none";
+  bottomBar.style.display   = "none";
+  fabWrap.style.display     = "none";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ── Extract ──────────────────────────────────────────────────────
+extractBtn.addEventListener("click", () => runOCR());
+
+async function runOCR() {
+  if (!selectedFile) return;
+  extractBtn.disabled = true;
+  previewCard.style.display  = "none";
+  progressCard.style.display = "block";
+  animateProgress();
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+
+  try {
+    const res  = await fetch("/api/process", { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!res.ok) { showToast("⚠️ " + (data.error || "Failed")); resetToScan(); return; }
+
+    currentFields = data.fields || [];
+    currentRaw    = data.full_text || "";
+
+    if (data.detected_language) {
+      langBadge.textContent  = "🌐 " + data.detected_language;
+      langBadge.style.display = "inline-block";
+    }
+
+    renderFields();
+    renderStats();
+    rawText.textContent = currentRaw;
+
+    progressCard.style.display   = "none";
+    resultsSection.style.display = "block";
+    bottomBar.style.display      = "block";
+    fabWrap.style.display        = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    showToast(`✅ ${currentFields.length} fields extracted`);
+  } catch (e) {
+    showToast("❌ " + e.message);
+    resetToScan();
+  } finally {
+    extractBtn.disabled = false;
+    progressCard.style.display = "none";
+    progressFill.style.width = "0%";
+  }
+}
+
+function animateProgress() {
+  const steps = [
+    [15, 500,  "Preprocessing",     "Deskewing & denoising…"],
+    [45, 1200, "Running OCR",       "Recognising text…"],
+    [75, 900,  "Detecting language","Identifying language pack…"],
+    [90, 600,  "Extracting fields", "Parsing key-value pairs…"],
+  ];
+  let i = 0;
+  (function next() {
+    if (i >= steps.length) return;
+    const [pct, delay, lbl, sub] = steps[i++];
+    progressFill.style.width = pct + "%";
+    progressLbl.textContent  = lbl;
+    progressSub.textContent  = sub;
+    setTimeout(next, delay);
+  })();
+}
+
+// ── Render fields ────────────────────────────────────────────────
+function renderFields() {
+  fieldsList.innerHTML = "";
+  if (!currentFields.length) {
+    fieldsList.innerHTML = `<div class="empty-state">No fields detected. Try a clearer photo or add fields manually.</div>`;
+    return;
+  }
+  currentFields.forEach((f, idx) => {
+    const conf  = f.confidence || "medium";
+    const div   = document.createElement("div");
+    div.className = `field-item conf-${conf}`;
+    div.dataset.idx = idx;
+    div.innerHTML = `
+      <div class="field-content">
+        <div class="field-name">${esc(f.field)}</div>
+        <div class="field-value" contenteditable="true"
+             data-idx="${idx}" data-placeholder="(empty)">${esc(f.value)}</div>
+      </div>
+      <div class="field-actions">
+        <button class="icon-btn" title="Delete" onclick="deleteField(${idx})">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+          </svg>
+        </button>
+      </div>`;
+    div.querySelector(".field-value").addEventListener("blur", e => {
+      currentFields[idx].value = e.target.textContent.trim();
+      renderStats();
+    });
+    fieldsList.appendChild(div);
+  });
+}
+
+function renderStats() {
+  const high  = currentFields.filter(f => f.confidence === "high").length;
+  const med   = currentFields.filter(f => f.confidence === "medium").length;
+  const empty = currentFields.filter(f => !f.value).length;
+  document.getElementById("s-total").textContent = currentFields.length;
+  document.getElementById("s-high").textContent  = high;
+  document.getElementById("s-med").textContent   = med;
+  document.getElementById("s-empty").textContent = empty;
+}
+
+window.deleteField = function(idx) {
+  currentFields.splice(idx, 1);
+  renderFields(); renderStats();
+};
+
+// ── Add field ────────────────────────────────────────────────────
+addFieldBtn.addEventListener("click", () => {
+  addFieldBar.style.display = addFieldBar.style.display === "block" ? "none" : "block";
+  if (addFieldBar.style.display === "block") document.getElementById("new-field-name").focus();
+});
+cancelAddBtn.addEventListener("click", () => { addFieldBar.style.display = "none"; });
+confirmAddBtn.addEventListener("click", addField);
+document.getElementById("new-field-value").addEventListener("keydown", e => {
+  if (e.key === "Enter") addField();
+});
+function addField() {
+  const name  = document.getElementById("new-field-name").value.trim();
+  const value = document.getElementById("new-field-value").value.trim();
+  if (!name) { showToast("Enter a field name"); return; }
+  currentFields.push({ field: name, value, type: "text", confidence: "high" });
+  renderFields(); renderStats();
+  document.getElementById("new-field-name").value = "";
+  document.getElementById("new-field-value").value = "";
+  addFieldBar.style.display = "none";
+  showToast("Field added");
+}
+
+// ── Raw OCR toggle ───────────────────────────────────────────────
+rawToggleBtn.addEventListener("click", () => {
+  const open = rawText.style.display === "block";
+  rawText.style.display = open ? "none" : "block";
+  rawToggleBtn.querySelector("svg").style.opacity = open ? "1" : ".5";
+});
+
+// ── Save & Scan Next ──────────────────────────────────────────────
+saveNextBtn.addEventListener("click", () => {
+  showToast("✅ Saved! Ready for next scan.");
+  resetToScan();
+});
+fabScanNext.addEventListener("click", () => {
+  showToast("✅ Saved! Ready for next scan.");
+  resetToScan();
+});
+
+// ── Export Excel ─────────────────────────────────────────────────
+exportBtn.addEventListener("click", () => doExport("xlsx"));
+
+async function doExport(fmt) {
+  if (!currentFields.length) { showToast("No fields to export"); return; }
+  exportBtn.disabled = true;
+  try {
+    const res  = await fetch("/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format: fmt, fields: currentFields, filename: "form_export" })
+    });
+    if (!res.ok) { showToast("Export failed"); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"), { href: url, download: `form_export.${fmt}` });
+    a.click(); URL.revokeObjectURL(url);
+    showToast("✅ Downloaded!");
+  } catch (e) { showToast("Error: " + e.message); }
+  finally { exportBtn.disabled = false; }
+}
+
+// ── Reset ────────────────────────────────────────────────────────
+function resetToScan() {
+  currentFields = []; currentRaw = ""; selectedFile = null;
+  fileInput.value = "";
+  scanHero.style.display       = "block";
+  previewCard.style.display    = "none";
+  progressCard.style.display   = "none";
+  resultsSection.style.display = "none";
+  bottomBar.style.display      = "none";
+  fabWrap.style.display        = "none";
+  rawText.style.display        = "none";
+  addFieldBar.style.display    = "none";
+  langBadge.style.display      = "none";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // Pulse the camera button to draw attention
+  const cb = document.getElementById("camera-btn");
+  cb.style.transform = "scale(1.04)";
+  setTimeout(() => cb.style.transform = "", 300);
+}
+
+// ── Utils ────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+let toastTimer;
+function showToast(msg, ms = 2600) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+</script>
+</body>
+</html>
