@@ -147,8 +147,8 @@ def _ssl_context():
 
 
 def call_gemini(images_b64: list[str], template_key: str) -> dict:
-    """FREE tier (Google AI Studio). Reads via the Gemini REST API."""
-    import urllib.request
+    """FREE tier (Google AI Studio). Reads via the Gemini REST API, with 429 backoff."""
+    import urllib.request, urllib.error, time
     parts = [{"inline_data": {"mime_type": "image/jpeg", "data": b}} for b in images_b64]
     parts.append({"text": build_prompt(template_key)})
     payload = {
@@ -159,10 +159,20 @@ def call_gemini(images_b64: list[str], template_key: str) -> dict:
            f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}")
     req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120, context=_ssl_context()) as r:
-        data = json.loads(r.read().decode())
-    text = data["candidates"][0]["content"]["parts"][0]["text"]
-    return _parse_json(text)
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=120, context=_ssl_context()) as r:
+                data = json.loads(r.read().decode())
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            return _parse_json(text)
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 3:
+                time.sleep(6 * (attempt + 1))   # free-tier per-minute limit — wait and retry
+                continue
+            if e.code == 429:
+                raise RuntimeError("Free-tier rate limit reached. Wait ~60s and retry, "
+                                   "or enable billing on the API key for higher limits.")
+            raise
 
 
 def call_anthropic(images_b64: list[str], template_key: str) -> dict:
