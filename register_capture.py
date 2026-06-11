@@ -36,8 +36,19 @@ except OSError:
     EXPORT_DIR = BASE_DIR / "exports"; EXPORT_DIR.mkdir(exist_ok=True)
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-VISION_MODEL      = os.environ.get("VISION_MODEL", "claude-sonnet-4-6")
+GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "")     # FREE tier: aistudio.google.com/apikey
+ANTHROPIC_MODEL   = os.environ.get("VISION_MODEL", "claude-sonnet-4-6")
+GEMINI_MODEL      = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 MAX_IMG_DIM       = 2200          # downscale before upload (cost + speed)
+
+# Prefer the free Gemini tier if its key is present, else Anthropic, else sample mode.
+if GEMINI_API_KEY:
+    PROVIDER, MODEL_NAME = "gemini", GEMINI_MODEL
+elif ANTHROPIC_API_KEY:
+    PROVIDER, MODEL_NAME = "anthropic", ANTHROPIC_MODEL
+else:
+    PROVIDER, MODEL_NAME = None, "sample"
+HAS_KEY = PROVIDER is not None
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
@@ -113,8 +124,36 @@ def prep_image(file_storage) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def call_vision(images_b64: list[str], template_key: str) -> dict:
-    """Send images to the vision model and parse structured rows."""
+def _parse_json(text: str) -> dict:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.lstrip().startswith("json"):
+            text = text.lstrip()[4:]
+    return json.loads(text.strip())
+
+
+def call_gemini(images_b64: list[str], template_key: str) -> dict:
+    """FREE tier (Google AI Studio). Reads via the Gemini REST API — stdlib only."""
+    import urllib.request
+    parts = [{"inline_data": {"mime_type": "image/jpeg", "data": b}} for b in images_b64]
+    parts.append({"text": build_prompt(template_key)})
+    payload = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {"maxOutputTokens": 8192, "responseMimeType": "application/json"},
+    }
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}")
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = json.loads(r.read().decode())
+    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    return _parse_json(text)
+
+
+def call_anthropic(images_b64: list[str], template_key: str) -> dict:
+    """Paid (no-training tier available). Best handwriting accuracy."""
     import anthropic
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     content = [{"type": "image",
@@ -122,14 +161,18 @@ def call_vision(images_b64: list[str], template_key: str) -> dict:
                for b in images_b64]
     content.append({"type": "text", "text": build_prompt(template_key)})
     msg = client.messages.create(
-        model=VISION_MODEL,
-        max_tokens=8000,
+        model=ANTHROPIC_MODEL, max_tokens=8000,
         messages=[{"role": "user", "content": content}],
     )
-    text = "".join(b.text for b in msg.content if b.type == "text").strip()
-    if text.startswith("```"):
-        text = text.split("```")[1].lstrip("json").strip()
-    return json.loads(text)
+    text = "".join(b.text for b in msg.content if b.type == "text")
+    return _parse_json(text)
+
+
+def call_vision(images_b64: list[str], template_key: str) -> dict:
+    """Dispatch to whichever provider has a key (free Gemini preferred)."""
+    if PROVIDER == "gemini":
+        return call_gemini(images_b64, template_key)
+    return call_anthropic(images_b64, template_key)
 
 
 # ── Sample fallback (so the UI works with no API key) ───────────────────────
@@ -142,8 +185,8 @@ SAMPLE_ROWS = json.loads((BASE_DIR / "sample_rows.json").read_text()) \
 def index():
     return render_template("capture.html",
                            templates=TEMPLATES,
-                           has_key=bool(ANTHROPIC_API_KEY),
-                           model=VISION_MODEL)
+                           has_key=HAS_KEY,
+                           model=MODEL_NAME)
 
 
 @app.route("/api/extract", methods=["POST"])
@@ -153,7 +196,7 @@ def extract():
     if template_key not in TEMPLATES:
         return jsonify({"error": "Unknown register type"}), 400
 
-    if not ANTHROPIC_API_KEY:
+    if not HAS_KEY:
         # Demo mode — return bundled sample so the UI is fully usable offline.
         return jsonify({"mode": "sample",
                         "columns": TEMPLATES[template_key]["columns"],
@@ -195,11 +238,16 @@ def export():
 
 @app.route("/api/health")
 def health():
-    return jsonify({"status": "ok", "vision_key": bool(ANTHROPIC_API_KEY), "model": VISION_MODEL})
+    return jsonify({"status": "ok", "vision_key": HAS_KEY,
+                    "provider": PROVIDER or "none", "model": MODEL_NAME})
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5060))
     print(f"\n  Register Capture → http://localhost:{port}")
-    print(f"  Vision: {'ON ('+VISION_MODEL+')' if ANTHROPIC_API_KEY else 'OFF — demo/sample mode (set ANTHROPIC_API_KEY)'}\n")
+    if HAS_KEY:
+        print(f"  Vision: ON — {PROVIDER} ({MODEL_NAME})\n")
+    else:
+        print("  Vision: OFF — demo/sample mode.")
+        print("  Free live reading: set GEMINI_API_KEY (free at aistudio.google.com/apikey)\n")
     app.run(host="0.0.0.0", port=port, debug=False)
