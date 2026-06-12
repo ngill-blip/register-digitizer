@@ -41,7 +41,8 @@ GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "").strip()   # FREE tier: 
 if not GEMINI_API_KEY and (BASE_DIR / "gemini_key.txt").exists():
     GEMINI_API_KEY = (BASE_DIR / "gemini_key.txt").read_text().strip()
 ANTHROPIC_MODEL   = os.environ.get("VISION_MODEL", "claude-sonnet-4-6")
-GEMINI_MODEL      = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL      = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL_CHOICES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"]
 MAX_IMG_DIM       = 2200          # downscale before upload (cost + speed)
 
 # Prefer the free Gemini tier if its key is present, else Anthropic, else sample mode.
@@ -146,9 +147,10 @@ def _ssl_context():
         return ssl.create_default_context()
 
 
-def call_gemini(images_b64: list[str], template_key: str) -> dict:
+def call_gemini(images_b64: list[str], template_key: str, model: str = None) -> dict:
     """FREE tier (Google AI Studio). Reads via the Gemini REST API, with 429 backoff."""
     import urllib.request, urllib.error, time
+    mdl = model or GEMINI_MODEL
     parts = [{"inline_data": {"mime_type": "image/jpeg", "data": b}} for b in images_b64]
     parts.append({"text": build_prompt(template_key)})
     payload = {
@@ -156,7 +158,7 @@ def call_gemini(images_b64: list[str], template_key: str) -> dict:
         "generationConfig": {"maxOutputTokens": 8192, "responseMimeType": "application/json"},
     }
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}")
+           f"{mdl}:generateContent?key={GEMINI_API_KEY}")
     req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})
     for attempt in range(4):
@@ -191,10 +193,10 @@ def call_anthropic(images_b64: list[str], template_key: str) -> dict:
     return _parse_json(text)
 
 
-def call_vision(images_b64: list[str], template_key: str) -> dict:
+def call_vision(images_b64: list[str], template_key: str, model: str = None) -> dict:
     """Dispatch to whichever provider has a key (free Gemini preferred)."""
     if PROVIDER == "gemini":
-        return call_gemini(images_b64, template_key)
+        return call_gemini(images_b64, template_key, model)
     return call_anthropic(images_b64, template_key)
 
 
@@ -209,7 +211,9 @@ def index():
     return render_template("capture.html",
                            templates=TEMPLATES,
                            has_key=HAS_KEY,
-                           model=MODEL_NAME)
+                           provider=PROVIDER or "none",
+                           model=MODEL_NAME,
+                           gemini_models=GEMINI_MODEL_CHOICES if PROVIDER == "gemini" else [])
 
 
 @app.route("/api/extract", methods=["POST"])
@@ -229,7 +233,8 @@ def extract():
         return jsonify({"error": "No images uploaded"}), 400
     try:
         imgs = [prep_image(f) for f in files]
-        result = call_vision(imgs, template_key)
+        model = request.form.get("model") or None
+        result = call_vision(imgs, template_key, model)
         result["mode"] = "vision"
         result["columns"] = TEMPLATES[template_key]["columns"]
         return jsonify(result)
