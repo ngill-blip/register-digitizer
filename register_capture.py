@@ -208,6 +208,31 @@ def call_vision(images_b64: list[str], template_key: str, model: str = None) -> 
     return call_anthropic(images_b64, template_key)
 
 
+def parse_spreadsheet(file_storage) -> dict:
+    """Read an Excel/CSV directly into rows — shows the tool ingests any data type,
+    not just register photos (e.g. LIM or spirometry exports). No vision/key needed."""
+    name = file_storage.filename.lower()
+    if name.endswith(".csv"):
+        text = file_storage.stream.read().decode("utf-8-sig", errors="replace")
+        data = list(csv.reader(io.StringIO(text)))
+    else:
+        import openpyxl
+        wb = openpyxl.load_workbook(file_storage.stream, read_only=True, data_only=True)
+        data = [list(row) for row in wb.active.iter_rows(values_only=True)]
+    data = [r for r in data if any(str("" if c is None else c).strip() for c in r)]
+    if not data:
+        return {"mode": "spreadsheet", "columns": [], "rows": []}
+    headers = [str(h).strip() if h not in (None, "") else f"col{i+1}" for i, h in enumerate(data[0])]
+    rows = []
+    for r in data[1:]:
+        row = {}
+        for i, h in enumerate(headers):
+            v = str(r[i]).strip() if i < len(r) and r[i] is not None else ""
+            row[h] = {"v": v, "c": "high"}
+        rows.append(row)
+    return {"mode": "spreadsheet", "columns": [[h, h] for h in headers], "rows": rows}
+
+
 # ── Sample fallback (so the UI works with no API key) ───────────────────────
 SAMPLE_ROWS = json.loads((BASE_DIR / "sample_rows.json").read_text()) \
     if (BASE_DIR / "sample_rows.json").exists() else {"rows": []}
@@ -230,6 +255,15 @@ def extract():
     files = request.files.getlist("images")
     if template_key not in TEMPLATES:
         return jsonify({"error": "Unknown register type"}), 400
+
+    # Spreadsheet path — parse Excel/CSV directly (no vision model needed).
+    sheet = next((f for f in files if f.filename.lower().endswith((".xlsx", ".xls", ".csv"))), None)
+    if sheet is not None:
+        try:
+            return jsonify(parse_spreadsheet(sheet))
+        except Exception as e:
+            app.logger.exception("spreadsheet parse failed")
+            return jsonify({"error": f"Could not read spreadsheet: {e}"}), 500
 
     if not HAS_KEY:
         # Demo mode — return bundled sample so the UI is fully usable offline.
