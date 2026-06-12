@@ -153,9 +153,11 @@ def call_gemini(images_b64: list[str], template_key: str, model: str = None) -> 
     mdl = model or GEMINI_MODEL
     parts = [{"inline_data": {"mime_type": "image/jpeg", "data": b}} for b in images_b64]
     parts.append({"text": build_prompt(template_key)})
+    # 2.5/3.x support large outputs; a full register page of per-cell JSON can exceed 8k tokens.
+    max_out = 65536 if ("2.5" in mdl or "3" in mdl) else 8192
     payload = {
         "contents": [{"parts": parts}],
-        "generationConfig": {"maxOutputTokens": 8192, "responseMimeType": "application/json"},
+        "generationConfig": {"maxOutputTokens": max_out, "responseMimeType": "application/json"},
     }
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{mdl}:generateContent?key={GEMINI_API_KEY}")
