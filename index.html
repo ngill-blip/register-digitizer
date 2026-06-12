@@ -111,6 +111,17 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
 
+  <div class="panel" style="margin-bottom:16px">
+    <h2>Assessment parameters</h2>
+    <div class="ph">Choose what to assess per site. Suggested parameters reflect the iPACT indicators — click to add, or type your own. Each one adds a column to the site-wise breakdown below.</div>
+    <div id="suggested" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input id="paramInput" type="text" placeholder="Add a custom parameter…" style="flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:.86rem"/>
+      <button id="addParamBtn" style="background:var(--green);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.84rem;cursor:pointer">+ Add</button>
+    </div>
+    <div id="activeParams" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px"></div>
+  </div>
+
   <div class="tbl-wrap">
     <h2>Site detail</h2>
     <div class="ph">One row per site · source systems show where each number comes from · <span class="dot ok"></span>synced today <span class="dot lag"></span>1–3 days <span class="dot stale"></span>&gt;3 days behind</div>
@@ -159,20 +170,47 @@ function draw(){
       plugins:{legend:{display:false}},
       scales:{x:{beginAtZero:true,grid,ticks:{font:{size:11}}},y:{grid:{display:false},ticks:{font:{size:10.5}}}}}
   });
+  renderParams();
+  renderSiteTable();
+}
+
+// ---- assessment parameters: suggested + custom, each adds a site-wise column ----
+const SUGGESTED=["Treatment success %","Contacts traced","TPT initiated","DR-TB cases","Childhood TB (<15)","HIV co-infected %","Time-to-treatment (days)","Smear-positive %"];
+let EXTRA=[];
+function pseudo(s){let h=5;for(let i=0;i<s.length;i++)h=(h*33+s.charCodeAt(i))>>>0;return h;}
+function sampleFor(site,param){const h=pseudo(site+'|'+param);
+  if(/%/.test(param))return (38+h%58)+'%';
+  if(/day/i.test(param))return (3+h%13)+' d';
+  return (5+h%95);}
+function addParam(p){p=(p||'').trim();if(!p||EXTRA.includes(p))return;EXTRA.push(p);renderParams();renderSiteTable();}
+function removeParam(p){EXTRA=EXTRA.filter(x=>x!==p);renderParams();renderSiteTable();}
+function renderParams(){
+  document.getElementById('suggested').innerHTML=SUGGESTED.filter(p=>!EXTRA.includes(p)).map(p=>
+    `<button data-p="${p}" class="sugg" style="background:var(--green-l);color:var(--green-d);border:1px solid #c3ddcd;border-radius:99px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer">+ ${p}</button>`).join('');
+  document.getElementById('activeParams').innerHTML=EXTRA.map(p=>
+    `<span style="background:var(--green);color:#fff;border-radius:99px;padding:5px 12px;font-size:.78rem;font-weight:600">${p} <span data-rm="${p}" class="rmp" style="cursor:pointer;opacity:.85;margin-left:4px">✕</span></span>`).join('');
+  document.querySelectorAll('.sugg').forEach(b=>b.onclick=()=>addParam(b.dataset.p));
+  document.querySelectorAll('.rmp').forEach(b=>b.onclick=()=>removeParam(b.dataset.rm));
+}
+function renderSiteTable(){
   const labels={delft:'Delft',lim:'LIM',spiro:'Spiro',reg:'Register'};
+  const extraTh=EXTRA.map(p=>`<th>${p}</th>`).join('');
   document.querySelector('#sites thead').innerHTML=
-    "<tr><th>Site</th><th>County</th><th>Sources</th><th>Screened</th><th>Presumptive</th><th>Confirmed</th><th>Asympt.</th><th>Yield</th><th>Sync</th></tr>";
-  const tb=document.querySelector('#sites tbody');
+    "<tr><th>Site</th><th>County</th><th>Sources</th><th>Screened</th><th>Presumptive</th><th>Confirmed</th><th>Asympt.</th><th>Yield</th>"+extraTh+"<th>Sync</th></tr>";
+  const tb=document.querySelector('#sites tbody');tb.innerHTML='';
   SITES.forEach(s=>{
     const y=((s.asymp/s.screened)*100).toFixed(1);
     const chips=s.sys.map(k=>`<span class="sys ${k}">${labels[k]}</span>`).join('');
+    const extraTd=EXTRA.map(p=>`<td class="num">${sampleFor(s.site,p)}</td>`).join('');
     tb.insertAdjacentHTML('beforeend',
       `<tr><td><b>${s.site}</b></td><td>${s.county}</td><td>${chips}</td>
        <td class="num">${s.screened.toLocaleString()}</td><td class="num">${s.presumptive}</td>
        <td class="num">${s.confirmed}</td><td class="num">${s.asymp}</td>
-       <td class="num yield">${y}%</td><td><span class="dot ${s.status}"></span>${s.status==='ok'?'today':s.status==='lag'?'1–3 d':'>3 d'}</td></tr>`);
+       <td class="num yield">${y}%</td>${extraTd}<td><span class="dot ${s.status}"></span>${s.status==='ok'?'today':s.status==='lag'?'1–3 d':'>3 d'}</td></tr>`);
   });
 }
+document.getElementById('addParamBtn').onclick=()=>{const i=document.getElementById('paramInput');addParam(i.value);i.value='';};
+document.getElementById('paramInput').addEventListener('keydown',e=>{if(e.key==='Enter'){addParam(e.target.value);e.target.value='';}});
 draw();
 </script>
 </body>
