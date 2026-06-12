@@ -168,12 +168,15 @@ def call_gemini(images_b64: list[str], template_key: str, model: str = None) -> 
             text = data["candidates"][0]["content"]["parts"][0]["text"]
             return _parse_json(text)
         except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < 3:
-                time.sleep(6 * (attempt + 1))   # free-tier per-minute limit — wait and retry
+            if e.code in (429, 500, 503) and attempt < 3:
+                time.sleep(5 * (attempt + 1))   # rate limit or transient overload — wait and retry
                 continue
             if e.code == 429:
-                raise RuntimeError("Free-tier rate limit reached. Wait ~60s and retry, "
-                                   "or enable billing on the API key for higher limits.")
+                raise RuntimeError("Rate limit reached. Wait ~60s and retry, "
+                                   "or check that billing is enabled on the key.")
+            if e.code in (500, 503):
+                raise RuntimeError("Gemini is briefly overloaded (503). Click Read again in a few "
+                                   "seconds, or switch to gemini-2.5-flash-lite.")
             if e.code == 404:
                 raise RuntimeError(f"Model '{mdl}' isn't available for this key. "
                                    "Pick a different model from the dropdown.")
