@@ -125,6 +125,13 @@ document.addEventListener('keydown',function(e){if(e.key==='Enter'&&!document.bo
       </div>
       <div><label>Facility</label><input type="text" id="facility" placeholder="e.g. Rhodes Chest Clinic"/></div>
       <div><label>Register / page no.</label><input type="text" id="pageno" placeholder="e.g. Book 4, p.12"/></div>
+      {% if gemini_models %}
+      <div><label>AI model</label>
+        <select id="model">
+          {% for m in gemini_models %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
     </div>
 
     <h2 style="margin-top:20px"><span class="h-num">2</span> Capture the page</h2>
@@ -205,6 +212,7 @@ async function extract(){
 
   const fd=new FormData();
   fd.append("template",$("#template").value);
+  const mEl=document.getElementById("model"); if(mEl) fd.append("model",mEl.value);
   if(imgs.L) fd.append("images",imgs.L);
   if(imgs.R) fd.append("images",imgs.R);
   try{
