@@ -42,7 +42,7 @@ if not GEMINI_API_KEY and (BASE_DIR / "gemini_key.txt").exists():
     GEMINI_API_KEY = (BASE_DIR / "gemini_key.txt").read_text().strip()
 ANTHROPIC_MODEL   = os.environ.get("VISION_MODEL", "claude-sonnet-4-6")
 GEMINI_MODEL      = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_MODEL_CHOICES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"]
+GEMINI_MODEL_CHOICES = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
 MAX_IMG_DIM       = 2200          # downscale before upload (cost + speed)
 
 # Prefer the free Gemini tier if its key is present, else Anthropic, else sample mode.
@@ -174,6 +174,9 @@ def call_gemini(images_b64: list[str], template_key: str, model: str = None) -> 
             if e.code == 429:
                 raise RuntimeError("Free-tier rate limit reached. Wait ~60s and retry, "
                                    "or enable billing on the API key for higher limits.")
+            if e.code == 404:
+                raise RuntimeError(f"Model '{mdl}' isn't available for this key. "
+                                   "Pick a different model from the dropdown.")
             raise
 
 
