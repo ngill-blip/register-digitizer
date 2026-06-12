@@ -68,7 +68,16 @@ tr.pos td{background:var(--red-l)}
 .status{text-align:center;font-family:var(--mono);font-size:.8rem;color:var(--green);min-height:18px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:10px;font-weight:600;font-size:.85rem;opacity:0;transition:.25s;z-index:99}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(max-width:620px){.slots{grid-template-columns:1fr}}
+/* journey strip */
+.journey{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.jstep{flex:1;min-width:140px;display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 12px;transition:.18s;opacity:.5}
+.jstep.on{opacity:1;border-color:var(--green);box-shadow:0 0 0 2px var(--green-l)}
+.jstep.done{opacity:1}
+.jstep.on .jn,.jstep.done .jn{background:var(--green);color:#fff;border-color:var(--green)}
+.jn{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;color:var(--muted);background:#fff}
+.jt{font-weight:700;font-size:.82rem;line-height:1.2}
+.jt small{display:block;font-weight:400;font-size:.7rem;color:var(--muted);margin-top:1px}
+@media(max-width:620px){.slots{grid-template-columns:1fr}.jstep small{display:none}.jstep{min-width:0}}
 #gate{position:fixed;inset:0;background:var(--bg);z-index:3000;display:flex;flex-direction:column;
  align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
 body.unlocked #gate{display:none}
@@ -111,6 +120,13 @@ document.addEventListener('keydown',function(e){if(e.key==='Enter'&&!document.bo
   <div id="qrbox">
     <div id="qrcode"></div>
     <div class="qt"><b>Scan to open on your phone</b>Point your camera here, then photograph a register page.</div>
+  </div>
+
+  <div class="journey" id="journey">
+    <div class="jstep on" data-j="0"><span class="jn">1</span><span class="jt">Capture<small>Photograph the page</small></span></div>
+    <div class="jstep" data-j="1"><span class="jn">2</span><span class="jt">AI reads<small>Vision model scans the grid</small></span></div>
+    <div class="jstep" data-j="2"><span class="jn">3</span><span class="jt">Structured rows<small>One row per patient</small></span></div>
+    <div class="jstep" data-j="3"><span class="jn">4</span><span class="jt">Review &amp; export<small>Fix flags, download</small></span></div>
   </div>
 
   <!-- SETUP -->
@@ -183,6 +199,8 @@ const imgs={L:null,R:null};
 let COLS=[], ROWS=[];
 const $=s=>document.querySelector(s);
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._);t._=setTimeout(()=>t.classList.remove("show"),2200)};
+function setStage(n){document.querySelectorAll('.jstep').forEach(el=>{const i=+el.dataset.j;el.classList.toggle('on',i===n);el.classList.toggle('done',i<n);});}
+setStage(0);
 
 function pick(side){ $("#file"+side).click(); }
 ["L","R"].forEach(side=>{
@@ -205,7 +223,7 @@ function clearSlot(side){
 }
 
 async function extract(){
-  $("#extractBtn").disabled=true; $("#spin").style.display="block";
+  $("#extractBtn").disabled=true; $("#spin").style.display="block"; setStage(1);
   const steps=["Uploading page…","Detecting table grid…","Reading handwriting…","Scoring confidence…"];
   let i=0; $("#status").textContent=steps[0];
   const iv=setInterval(()=>{ i=(i+1)%steps.length; $("#status").textContent=steps[i]; },900);
@@ -222,7 +240,7 @@ async function extract(){
     if(!res.ok){ toast("⚠ "+(data.error||"Failed")); $("#extractBtn").disabled=false; return; }
     COLS=data.columns; ROWS=data.rows||[];
     if(data.mode==="sample") toast("Demo mode — showing sample data (set an API key to read live)");
-    renderTable();
+    renderTable(); setStage(3);
     $("#review").style.display="block";
     $("#review").scrollIntoView({behavior:"smooth"});
   }catch(e){ clearInterval(iv); $("#spin").style.display="none"; toast("Error: "+e.message); $("#extractBtn").disabled=false; }
@@ -270,7 +288,7 @@ async function exportCSV(){
 function reset(){
   clearSlot('L'); clearSlot('R');
   ROWS=[]; $("#review").style.display="none";
-  $("#extractBtn").disabled=true; window.scrollTo({top:0,behavior:"smooth"});
+  $("#extractBtn").disabled=true; setStage(0); window.scrollTo({top:0,behavior:"smooth"});
 }
 </script>
 </body>
