@@ -78,14 +78,6 @@ tr.pos td{background:var(--red-l)}
 .jt{font-weight:700;font-size:.82rem;line-height:1.2}
 .jt small{display:block;font-weight:400;font-size:.7rem;color:var(--muted);margin-top:1px}
 @media(max-width:620px){.slots{grid-template-columns:1fr}.jstep small{display:none}.jstep{min-width:0}}
-#gate{position:fixed;inset:0;background:var(--bg);z-index:3000;display:flex;flex-direction:column;
- align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
-body.unlocked #gate{display:none}
-body:not(.unlocked) .wrap{display:none}
-#gate .gk{font-family:Georgia,serif;font-size:1.5rem;color:var(--green)}
-#gate p{color:var(--muted);font-size:.9rem;max-width:380px}
-#gate input{padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:1rem;width:240px;text-align:center}
-#gate .err{color:var(--red);font-size:.82rem;min-height:18px}
 #qrbox{display:flex;align-items:center;gap:12px;background:var(--green-l);border:1px solid #c3ddcd;border-radius:11px;padding:10px 14px;margin-bottom:16px}
 #qrbox canvas,#qrbox img{border-radius:6px;background:#fff;padding:4px}
 #qrbox .qt{font-size:.8rem;color:var(--green-d);text-align:left}
@@ -94,20 +86,9 @@ body:not(.unlocked) .wrap{display:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
-<div id="gate">
-  <div class="gk">Register Capture</div>
-  <p>Enter the access password shared in this session to continue.</p>
-  <input id="gpw" type="password" placeholder="Password" autocomplete="off"/>
-  <div class="err" id="gerr"></div>
-  <button class="cta" onclick="tryUnlock()">Enter</button>
-  <small style="color:var(--muted);font-size:.72rem;max-width:360px">Light access gate for a live preview. Uploaded photos are read in memory and never saved to disk.</small>
-</div>
 <script>
-function tryUnlock(){var v=document.getElementById('gpw').value;
- if(v==='KenyaTB2026'){document.body.classList.add('unlocked');drawQR();}
- else{document.getElementById('gerr').textContent='Incorrect password.';}}
 function drawQR(){try{var b=document.getElementById('qrcode');if(b&&!b.hasChildNodes()){new QRCode(b,{text:window.location.href,width:84,height:84});}}catch(e){}}
-document.addEventListener('keydown',function(e){if(e.key==='Enter'&&!document.body.classList.contains('unlocked'))tryUnlock();});
+window.addEventListener('DOMContentLoaded',drawQR);
 </script>
 <div class="wrap">
   <header>
@@ -168,6 +149,12 @@ document.addEventListener('keydown',function(e){if(e.key==='Enter'&&!document.bo
       <b>left half</b> then the <b>right half</b> of the same page, holding the phone flat and steady in good light.
       One half is enough to test — both gives the full record.
     </div>
+    <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px dashed var(--line)">
+      <label style="font-size:.82rem;font-weight:700;color:var(--ink)">Or add a spreadsheet:</label>
+      <span style="font-size:.78rem;color:var(--muted)">Excel / CSV exported from LIM, spirometry, etc.</span>
+      <input type="file" id="fileSheet" accept=".xlsx,.xls,.csv"/>
+      <span id="sheetName" style="font-size:.8rem;color:var(--green);font-weight:600"></span>
+    </div>
     <div style="margin-top:16px">
       <button class="cta" id="extractBtn" onclick="extract()" disabled>Read this page →</button>
     </div>
@@ -195,7 +182,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Enter'&&!document.bo
 <div class="toast" id="toast"></div>
 
 <script>
-const imgs={L:null,R:null};
+const imgs={L:null,R:null,sheet:null};
 let COLS=[], ROWS=[];
 const $=s=>document.querySelector(s);
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._);t._=setTimeout(()=>t.classList.remove("show"),2200)};
@@ -210,8 +197,13 @@ function pick(side){ $("#file"+side).click(); }
     const slot=$("#slot"+side); const url=URL.createObjectURL(f);
     slot.classList.add("filled");
     slot.innerHTML=`<img src="${url}"/><button class="rm" onclick="event.stopPropagation();clearSlot('${side}')">remove</button>`;
-    $("#extractBtn").disabled = !(imgs.L||imgs.R);
+    $("#extractBtn").disabled = !(imgs.L||imgs.R||imgs.sheet);
   });
+});
+$("#fileSheet").addEventListener("change",e=>{
+  imgs.sheet=e.target.files[0]||null;
+  $("#sheetName").textContent=imgs.sheet?("✓ "+imgs.sheet.name):"";
+  $("#extractBtn").disabled=!(imgs.L||imgs.R||imgs.sheet);
 });
 function clearSlot(side){
   imgs[side]=null;
@@ -219,7 +211,7 @@ function clearSlot(side){
   const lbl=side==='L'?'Left half':'Right half';
   const hint=side==='L'?'ID, name, age, phone, facility':'HIV, microscopy, GeneXpert, results';
   slot.innerHTML=`<div class="lbl">+ ${lbl}</div><div class="hint">${hint}</div>`;
-  $("#extractBtn").disabled = !(imgs.L||imgs.R);
+  $("#extractBtn").disabled = !(imgs.L||imgs.R||imgs.sheet);
 }
 
 async function extract(){
@@ -233,6 +225,7 @@ async function extract(){
   const mEl=document.getElementById("model"); if(mEl) fd.append("model",mEl.value);
   if(imgs.L) fd.append("images",imgs.L);
   if(imgs.R) fd.append("images",imgs.R);
+  if(imgs.sheet) fd.append("images",imgs.sheet);
   try{
     const res=await fetch("/api/extract",{method:"POST",body:fd});
     const data=await res.json();
