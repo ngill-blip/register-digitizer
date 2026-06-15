@@ -226,6 +226,8 @@ async function extract(){
 
   const fd=new FormData();
   fd.append("template",$("#template").value);
+  fd.append("facility",(document.getElementById("facility")||{}).value||"");
+  fd.append("pageno",(document.getElementById("pageno")||{}).value||"");
   const mEl=document.getElementById("model"); if(mEl) fd.append("model",mEl.value);
   if(imgs.L) fd.append("images",imgs.L);
   if(imgs.R) fd.append("images",imgs.R);
