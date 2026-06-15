@@ -18,6 +18,7 @@ so the whole capture + review UI is usable offline for demos.
 
 import os
 import io
+import re
 import csv
 import json
 import base64
@@ -34,6 +35,14 @@ try:
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 except OSError:
     EXPORT_DIR = BASE_DIR / "exports"; EXPORT_DIR.mkdir(exist_ok=True)
+
+# Register photos are archived ONLY here, on this machine (the permitted custodian).
+# Field phones keep nothing; images are uploaded, saved here, then read.
+ARCHIVE_DIR = Path.home() / "Desktop" / "Claude (DND)" / "Register Captures"
+try:
+    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    ARCHIVE_DIR = BASE_DIR / "captures"; ARCHIVE_DIR.mkdir(exist_ok=True)
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "").strip()   # FREE tier: aistudio.google.com/apikey
@@ -115,9 +124,9 @@ Return STRICT JSON only, no prose, in this shape:
 
 
 # ── Image helpers ─────────────────────────────────────────────────────────
-def prep_image(file_storage) -> str:
-    """EXIF-rotate, downscale, return base64 JPEG."""
-    im = Image.open(file_storage.stream)
+def prep_image_bytes(raw: bytes) -> str:
+    """EXIF-rotate, downscale, return base64 JPEG (from raw bytes)."""
+    im = Image.open(io.BytesIO(raw))
     im = ImageOps.exif_transpose(im)
     w, h = im.size
     if max(w, h) > MAX_IMG_DIM:
@@ -126,6 +135,19 @@ def prep_image(file_storage) -> str:
     buf = io.BytesIO()
     im.convert("RGB").save(buf, "JPEG", quality=82)
     return base64.b64encode(buf.getvalue()).decode()
+
+
+def archive_image(raw: bytes, facility: str, page: str, idx: int, orig_name: str) -> None:
+    """Save the uploaded photo to ARCHIVE_DIR on this machine (the permitted custodian)."""
+    try:
+        fac = re.sub(r"[^\w\-]", "_", (facility or "site").strip())[:30] or "site"
+        pg  = re.sub(r"[^\w\-]", "_", (page or "").strip())[:20]
+        ext = (orig_name.rsplit(".", 1)[-1].lower() if "." in orig_name else "jpg")[:4]
+        ts  = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        fname = f"{ts}_{fac}{('_'+pg) if pg else ''}_{idx}.{ext}"
+        (ARCHIVE_DIR / fname).write_bytes(raw)
+    except Exception:
+        app.logger.exception("archive save failed (non-fatal)")
 
 
 def _parse_json(text: str) -> dict:
@@ -274,7 +296,13 @@ def extract():
     if not files:
         return jsonify({"error": "No images uploaded"}), 400
     try:
-        imgs = [prep_image(f) for f in files]
+        facility = request.form.get("facility", "")
+        page = request.form.get("pageno", "")
+        imgs = []
+        for idx, f in enumerate(files, 1):
+            raw = f.read()
+            archive_image(raw, facility, page, idx, f.filename or "scan.jpg")
+            imgs.append(prep_image_bytes(raw))
         model = request.form.get("model") or None
         result = call_vision(imgs, template_key, model)
         result["mode"] = "vision"
